@@ -14,6 +14,14 @@ let didDrag = false;
 
 const LABEL_RADIUS = 15;
 
+// === 보드 크기 조정 ===
+function resizeBoard() {
+  svg.setAttribute("width", window.innerWidth - 150);
+  svg.setAttribute("height", window.innerHeight);
+}
+window.addEventListener("resize", resizeBoard);
+resizeBoard();
+
 // === 원 그리기 ===
 function drawCircle() {
   const w = svg.clientWidth;
