@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Geometry App</title>
+  <script src="main.js" defer></script>
+  <style>
+    body {
+      display: flex;
+      margin: 0;
+      height: 100vh;
+      font-family: sans-serif;
+    }
+    #sidebar {
+      width: 150px;
+      background: #f0f0f0;
+      border-right: 1px solid #aaa;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    #board {
+      flex: 1;
+      background: #fff;
+    }
+    #info {
+      width: 200px;
+      background: #fafafa;
+      border-left: 1px solid #aaa;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    /* 🔒 텍스트 선택 방지 */
+    body, svg, text {
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    text {
+      cursor: pointer; /* 기본 커서 */
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h3>기능</h3>
+    <button id="drawCircleBtn">원 그리기</button>
+  </div>
+  <svg id="board"></svg>
+  <div id="info">
+    <h3>측정값</h3>
+    <p>여기에 각종 정보를 표시합니다.</p>
+  </div>
+</body>
+</html>
