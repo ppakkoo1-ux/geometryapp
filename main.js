@@ -1,6 +1,6 @@
-import { setupChord } from './chord.js';
+import { createChord } from './chord.js';
 
-export const svg = document.getElementById("board");
+const svg = document.getElementById("board");
 const btn = document.getElementById("drawCircleBtn");
 
 let circle = null;
@@ -11,6 +11,11 @@ let offsetX = 0, offsetY = 0;
 let pointIndex = 0;
 let draggingPoint = null;
 let didDrag = false;
+
+let chordMode = false;
+let deleteChordMode = false;
+let chordSelectedPoints = [];
+let chords = [];
 
 const LABEL_RADIUS = 15;
 
@@ -61,7 +66,7 @@ function drawCircle() {
 }
 btn.addEventListener("click", drawCircle);
 
-// === 점/라벨 업데이트 ===
+// === 점/라벨 및 연결된 현 업데이트 ===
 function updatePoints() {
   if (!circle) return;
 
@@ -84,7 +89,7 @@ function updatePoints() {
       pt.labelElement.setAttribute("y", ly);
     }
 
-    // 연결된 현도 갱신
+    // 연결된 현 갱신
     if (pt.chords) {
       pt.chords.forEach(ch => {
         ch.line.setAttribute("x1", pt.getAttribute("cx"));
@@ -219,5 +224,44 @@ svg.addEventListener("click", (e) => {
   }
 });
 
-// === 현 기능 불러오기 ===
-setupChord(svg, updatePoints);
+// === 현 버튼 이벤트 ===
+document.getElementById("drawChordBtn").addEventListener("click", () => {
+  chordMode = true;
+  chordSelectedPoints = [];
+  deleteChordMode = false;
+  alert("원 위의 두 점을 선택하세요.");
+});
+
+document.getElementById("deleteChordBtn").addEventListener("click", () => {
+  deleteChordMode = true;
+  chordMode = false;
+  chordSelectedPoints = [];
+  alert("삭제할 현을 클릭하세요.");
+});
+
+// === 현 제어 ===
+svg.addEventListener("click", (e) => {
+  if (deleteChordMode && e.target.tagName === "line") {
+    const line = e.target;
+    line.remove();
+    chords = chords.filter(ch => ch !== line);
+
+    // 연결된 점에서 현 제거
+    line.points.forEach(pt => {
+      pt.chords = pt.chords.filter(ch => ch.line !== line);
+    });
+
+    deleteChordMode = false;
+    return;
+  }
+
+  if (chordMode && e.target.tagName === "circle" && e.target.dataset.label) {
+    chordSelectedPoints.push(e.target);
+    if (chordSelectedPoints.length === 2) {
+      const line = createChord(svg, chordSelectedPoints[0], chordSelectedPoints[1]);
+      chords.push(line);
+      chordSelectedPoints = [];
+      chordMode = false;
+    }
+  }
+});
