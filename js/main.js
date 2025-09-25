@@ -267,5 +267,3 @@ svg.addEventListener("click", (e) => {
     }
   }
 });
-}
-
