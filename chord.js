@@ -1,7 +1,6 @@
 // chord.js : 현(Chord) 관련 기능
-import { updatePoints } from './main.js';
 
-export function setupChord(svg) {
+export function setupChord(svg, updatePoints) {
   let chordMode = false;
   let chordSelectedPoints = [];
   let deleteChordMode = false;
@@ -68,6 +67,6 @@ export function setupChord(svg) {
     chords.push(line);
     svg.insertBefore(line, svg.firstChild);
 
-    updatePoints(); // 연결 상태 갱신
+    updatePoints(); // 현 갱신
   }
 }
