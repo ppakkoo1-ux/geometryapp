@@ -1,7 +1,9 @@
 import { createChord } from './chord.js';
 
-const svg = document.getElementById("board");
-const btn = document.getElementById("drawCircleBtn");
+document.addEventListener("DOMContentLoaded", () => {
+  const svg = document.getElementById("board");
+  const btn = document.getElementById("drawCircleBtn");
+
 
 let circle = null;
 let centerHandle = null;
@@ -265,3 +267,4 @@ svg.addEventListener("click", (e) => {
     }
   }
 });
+
