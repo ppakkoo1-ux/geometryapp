@@ -267,5 +267,5 @@ svg.addEventListener("click", (e) => {
     }
   }
 });
-
+}
 
