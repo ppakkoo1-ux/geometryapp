@@ -1,0 +1,43 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  font-family: Arial, sans-serif;
+}
+
+.container {
+  display: grid;
+  grid-template-columns: 20% 1fr 20%;
+  height: 100vh; /* 화면 전체 높이 */
+}
+
+.menu {
+  background-color: #f4f4f4;
+  padding: 10px;
+  border-right: 1px solid #ccc;
+}
+
+.panel {
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  background-color: #fafafa;
+}
+
+.info {
+  background-color: #f9f9f9;
+  padding: 10px;
+  border-left: 1px solid #ccc;
+}
