@@ -2,34 +2,34 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>원주각 학습 도구</title>
-  <style>
-    body {
-      margin: 0;
-      display: flex;
-    }
-    #sidebar {
-      width: 150px;
-      background: #f0f0f0;
-      padding: 10px;
-      box-sizing: border-box;
-    }
-    #board {
-      border: 1px solid #ccc;
-      display: block;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>원주각 학습 앱</title>
+  <link rel="stylesheet" href="./assets/style.css">
 </head>
 <body>
-  <div id="sidebar">
-    <h3>기능</h3>
-    <button id="drawCircleBtn">원 그리기</button>
-    <button id="drawChordBtn">현 그리기</button>
-    <button id="deleteChordBtn">현 삭제</button>
-  </div>
-  <svg id="board"></svg>
+  <div class="container">
+    <!-- 좌측 컨트롤 메뉴 -->
+    <div class="menu">
+      <h3>컨트롤</h3>
+      <button>원</button>
+      <button>점</button>
+      <button>초기화</button>
+    </div>
 
-  <!-- main.js를 모듈로 불러오기 -->
-  <script type="module" src="js/main.js"></script>
+    <!-- 중앙 패널 -->
+    <div class="panel">
+      <canvas id="board"></canvas>
+    </div>
+
+    <!-- 우측 측정치 -->
+    <div class="info">
+      <h3>측정치</h3>
+      <p>각도: -</p>
+      <p>좌표: -</p>
+    </div>
+  </div>
+
+  <!-- 진입점 -->
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>
