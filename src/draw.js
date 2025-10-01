@@ -10,10 +10,6 @@ export function initBoard() {
   resizeCanvas();
   window.addEventListener("resize", resizeCanvas);
 
-  // 테스트용 기본 도형
-  drawCircle(300, 200, 100, "blue");
-  drawPoint(300, 100, "red");
-  drawLine(250, 200, 350, 200, "green");
 }
 
 // 캔버스 크기 자동 조절
