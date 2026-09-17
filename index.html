@@ -670,7 +670,7 @@ function startAction(e, via) {
   act = {
     pid, via, kind: 'pen', o, spts: [[x, y, p]],
     ptype: e.pointerType, t0: performance.now(),
-    anchor: [x, y], holdTimer: null, snapped: null
+    anchor: [x, y], anchorIdx: 0, holdTimer: null, snapped: null
   };
   armHold();
 }
@@ -703,6 +703,7 @@ function moveAction(e) {
     const lp = sp[sp.length - 1];
     if (Math.hypot(lp[0] - act.anchor[0], lp[1] - act.anchor[1]) > 4) {
       act.anchor = [lp[0], lp[1]];
+      act.anchorIdx = sp.length - 1;
       armHold();
     }
     return;
@@ -751,7 +752,8 @@ function armHold() {
 function onHold(a) {
   if (act !== a || a.snapped) return;
   if (a.o.space === 'world' && !VT) return;
-  const shp = recognize(a.spts);
+  // 펜을 멈춘 뒤 들어온 떨림 좌표는 판정에서 제외
+  const shp = recognize(a.spts.slice(0, a.anchorIdx + 1));
   if (!shp) return;
   a.snapped = shp;
   applyShape(a);
@@ -779,23 +781,30 @@ function resample(sp, N) {
   }
   return out;
 }
-function recognize(sp) {
+function recognize(raw) {
+  if (raw.length < 3) return null;
+  // 2.5px보다 촘촘한 좌표는 솎아냄 (미세 떨림이 길이에 더해지지 않도록)
+  const sp = [raw[0]];
+  for (let i = 1; i < raw.length; i++) {
+    const l = sp[sp.length - 1];
+    if (Math.hypot(raw[i][0] - l[0], raw[i][1] - l[1]) >= 2.5) sp.push(raw[i]);
+  }
   const n = sp.length;
   if (n < 3) return null;
   let P = 0;
   for (let i = 1; i < n; i++) P += Math.hypot(sp[i][0] - sp[i - 1][0], sp[i][1] - sp[i - 1][1]);
   const A = sp[0], B = sp[n - 1];
   const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
-  const pavg = sp.reduce((sum, q) => sum + q[2], 0) / n;
+  const pavg = raw.reduce((sum, q) => sum + q[2], 0) / raw.length;
 
   // 직선
-  if (L >= 25 && P <= L * 1.2) {
+  if (L >= 25 && P <= L * 1.25) {
     let dmax = 0;
     for (const q of sp) {
       const d = segDist(q[0], q[1], A[0], A[1], B[0], B[1]);
       if (d > dmax) dmax = d;
     }
-    if (dmax <= Math.max(5, L * 0.06)) {
+    if (dmax <= Math.max(6, L * 0.08)) {
       return { type: 'line', a: [A[0], A[1]], b: snapAngle(A, [B[0], B[1]]), pavg };
     }
   }
