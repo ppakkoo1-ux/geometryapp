@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>지오지브라 판서</title>
+<style>
+:root{
+  --bg:#e6eaf1; --bar:#ffffff; --bar-border:#d3d9e3; --text:#1d2b4f; --muted:#667089;
+  --btn:#f1f4f9; --btn-hover:#e3e8f1; --active:#2b59c3; --active-text:#ffffff; --sep:#dde2ea;
+  --board-edge:#cfd6e2; --msg-bg:rgba(29,43,79,.88); --msg-text:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12151c; --bar:#1b1f29; --bar-border:#2a303d; --text:#e4e8f0; --muted:#98a1b3;
+    --btn:#252a36; --btn-hover:#2f3544; --active:#5b86e5; --active-text:#ffffff; --sep:#2f3544;
+    --board-edge:#2a303d; --msg-bg:rgba(228,232,240,.92); --msg-text:#12151c;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{
+  position:fixed; inset:0;
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+  -webkit-touch-callout:none;
+}
+#app{display:flex;flex-direction:column;height:100%}
+#toolbar{
+  display:flex;align-items:center;gap:6px;flex:0 0 auto;
+  padding:6px 10px;padding-top:max(6px, env(safe-area-inset-top));
+  background:var(--bar);border-bottom:1px solid var(--bar-border);
+  overflow-x:auto;scrollbar-width:none;
+  -webkit-user-select:none;user-select:none;
+}
+#toolbar::-webkit-scrollbar{display:none}
+.group{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+.sep{width:1px;height:36px;background:var(--sep);flex:0 0 auto;margin:0 4px}
+.spacer{flex:1 1 auto;min-width:4px}
+button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:2px solid var(--active);outline-offset:2px}
+.tool{
+  min-width:54px;height:54px;padding:4px 6px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  border:0;border-radius:10px;background:var(--btn);cursor:pointer;
+}
+.tool svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tool span{font-size:11px;line-height:1;white-space:nowrap}
+.tool:hover{background:var(--btn-hover)}
+.tool.active{background:var(--active);color:var(--active-text)}
+.tool:disabled{opacity:.35;cursor:default;background:var(--btn)}
+.seg-ctl{display:flex;background:var(--btn);border-radius:10px;padding:3px;gap:2px}
+.seg-ctl button{
+  border:0;background:transparent;border-radius:8px;cursor:pointer;
+  min-width:58px;height:48px;padding:0 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+}
+.seg-ctl button b{font-size:14px;font-weight:600}
+.seg-ctl button small{font-size:10px;color:var(--muted);white-space:nowrap}
+.seg-ctl button.active{background:var(--active);color:var(--active-text)}
+.seg-ctl button.active small{color:inherit;opacity:.85}
+.swatch{
+  width:34px;height:34px;border-radius:50%;cursor:pointer;
+  background:var(--c);border:3px solid var(--bar);box-shadow:0 0 0 1px var(--bar-border);
+}
+.swatch.active{box-shadow:0 0 0 2.5px var(--active)}
+.wbtn{width:40px;height:40px;border-radius:10px;border:0;background:var(--btn);cursor:pointer;display:grid;place-items:center}
+.wbtn i{display:block;border-radius:50%;background:currentColor}
+.wbtn.active{background:var(--active);color:var(--active-text)}
+#stage{flex:1 1 auto;min-height:0;padding:8px;padding-bottom:max(8px, env(safe-area-inset-bottom))}
+#board{position:relative;width:100%;height:100%;background:#fff;border:1px solid var(--board-edge);border-radius:6px;overflow:hidden}
+#ggb{position:absolute;inset:0}
+#ink{position:absolute;inset:0;width:100%;height:100%;z-index:50;touch-action:none;pointer-events:none;display:block}
+#ink.drawing{pointer-events:auto;cursor:crosshair}
+#loading{
+  position:absolute;inset:0;display:grid;place-items:center;z-index:40;
+  color:#667089;font-size:15px;background:#fff;text-align:center;padding:20px;line-height:1.6;
+}
+#loading.hidden{display:none}
+#openPanel{
+  position:fixed;z-index:100;width:min(340px, calc(100vw - 16px));
+  background:var(--bar);color:var(--text);border:1px solid var(--bar-border);border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.18);padding:14px;display:none;
+}
+#openPanel.show{display:block}
+#openPanel h3{margin:0 0 8px;font-size:14px;font-weight:600}
+#openPanel p{margin:8px 0 0;font-size:12px;color:var(--muted);line-height:1.5;word-break:break-all}
+.pbtn{width:100%;height:44px;border:0;border-radius:10px;background:var(--active);color:var(--active-text);font-size:15px;font-weight:600;cursor:pointer}
+.prow{display:flex;gap:6px}
+.prow input{
+  flex:1;min-width:0;height:44px;padding:0 10px;
+  border:1px solid var(--bar-border);border-radius:10px;background:var(--bg);color:var(--text);
+  font:inherit;font-size:16px;
+}
+.prow input:focus{outline:2px solid var(--active);outline-offset:0}
+.prow button{height:44px;padding:0 16px;border:0;border-radius:10px;background:var(--btn);cursor:pointer;font-weight:600}
+.pdiv{height:1px;background:var(--sep);margin:14px 0}
+#toast{
+  position:absolute;top:12px;left:50%;transform:translate(-50%,-8px);z-index:60;
+  background:var(--msg-bg);color:var(--msg-text);
+  font-size:14px;padding:9px 14px;border-radius:8px;pointer-events:none;
+  opacity:0;transition:opacity .18s,transform .18s;max-width:calc(100% - 24px);text-align:center;
+}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion: reduce){#toast{transition:none}}
+#selBar{
+  position:absolute;z-index:55;display:none;gap:4px;padding:4px;
+  background:var(--bar);border:1px solid var(--bar-border);border-radius:10px;
+  box-shadow:0 4px 14px rgba(0,0,0,.16);
+}
+#selBar.show{display:flex}
+#selBar button{
+  height:40px;padding:0 14px;border:0;border-radius:8px;cursor:pointer;
+  background:var(--btn);color:var(--text);font-size:14px;font-weight:600;
+}
+#selBar button.danger{background:#e03131;color:#fff}
+#quickBtn{
+  position:absolute;z-index:56;left:0;top:0;width:58px;height:58px;padding:0;border-radius:50%;
+  border:1px solid var(--bar-border);background:var(--bar);color:var(--text);
+  box-shadow:0 4px 14px rgba(0,0,0,.18);display:grid;place-items:center;cursor:pointer;touch-action:none;
+}
+#quickBtn svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#quickBtn .q-eraser{display:none}
+#quickBtn.eraser{background:var(--active);color:var(--active-text);border-color:transparent}
+#quickBtn.eraser .q-pen{display:none}
+#quickBtn.eraser .q-eraser{display:block}
+</style>
+
+</head>
+<body>
+<div id="app">
+  <header id="toolbar">
+    <div class="seg-ctl" role="group" aria-label="입력 모드">
+      <button data-mode="auto"><b>자동</b><small>펜 필기·손 조작</small></button>
+      <button data-mode="draw"><b>필기</b><small>모든 입력 필기</small></button>
+      <button data-mode="ggb"><b>조작</b><small>모든 입력 조작</small></button>
+    </div>
+    <div class="sep"></div>
+    <div class="group">
+      <button class="tool" data-tool="pen" aria-label="펜">
+        <svg viewBox="0 0 24 24"><path d="M4 20l1-4.2L16.3 4.5a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19z"/><path d="M14.5 6.3l3.2 3.2"/></svg><span>펜</span>
+      </button>
+      <button class="tool" data-tool="eraser" aria-label="지우개">
+        <svg viewBox="0 0 24 24"><path d="M8 20h12"/><path d="M4.6 15.6l9.8-9.8a2 2 0 0 1 2.8 0l2 2a2 2 0 0 1 0 2.8L11 18.8H7.8z"/><path d="M9.2 11l4.8 4.8"/></svg><span>지우개</span>
+      </button>
+      <button class="tool" id="partialBtn" aria-pressed="false" aria-label="부분 지우기">
+        <svg viewBox="0 0 24 24"><path d="M3 18c2.5-4 4.5-5.5 6-5"/><path d="M15 11c1.5-2 3.5-4.5 6-6"/><circle cx="12" cy="12" r="3.4" stroke-dasharray="2 2"/></svg><span>부분 지우기</span>
+      </button>
+      <button class="tool" data-tool="select" aria-label="영역 선택">
+        <svg viewBox="0 0 24 24"><path d="M12 4.5c4.4 0 8 2.1 8 4.8s-3.6 4.8-8 4.8-8-2.1-8-4.8 3.6-4.8 8-4.8z" stroke-dasharray="2.6 2.4"/><path d="M7.5 13.3c-1 1.6-.6 3.2 1 3.9 1.3.6 1.4 2 .2 3.3"/></svg><span>영역 선택</span>
+      </button>
+      <button class="tool" id="shapeBtn" aria-pressed="true" aria-label="도형 보정">
+        <svg viewBox="0 0 24 24"><path d="M3 20.5L11.5 12"/><circle cx="16.5" cy="7.5" r="4.5"/></svg><span>도형 보정</span>
+      </button>
+    </div>
+    <div class="sep"></div>
+    <div class="group" id="colors"></div>
+    <div class="sep"></div>
+    <div class="group" id="widths"></div>
+    <div class="sep"></div>
+    <div class="group">
+      <button class="tool" id="openBtn" aria-label="자료 불러오기" aria-expanded="false">
+        <svg viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M12 16.5v-5M9.5 14L12 11.5l2.5 2.5"/></svg><span>불러오기</span>
+      </button>
+    </div>
+    <div class="spacer"></div>
+    <div class="group">
+      <button class="tool" id="undoBtn" aria-label="필기 실행 취소">
+        <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>필기 취소</span>
+      </button>
+      <button class="tool" id="redoBtn" aria-label="필기 다시 실행">
+        <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg><span>다시 실행</span>
+      </button>
+      <button class="tool" id="clearBtn" aria-label="필기 모두 지우기">
+        <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9 9.5l6 5M15 9.5l-6 5"/></svg><span>필기 지우기</span>
+      </button>
+    </div>
+  </header>
+  <main id="stage">
+    <div id="board">
+      <div id="ggb"></div>
+      <div id="loading">지오지브라를 불러오는 중…</div>
+      <canvas id="ink"></canvas>
+      <div id="selBar" role="toolbar" aria-label="선택한 필기">
+        <button class="danger" id="selDel">삭제</button>
+        <button id="selDone">선택 해제</button>
+      </div>
+      <button id="quickBtn" aria-label="펜/지우개 전환">
+        <svg class="q-pen" viewBox="0 0 24 24"><path d="M4 20l1-4.2L16.3 4.5a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19z"/><path d="M14.5 6.3l3.2 3.2"/></svg>
+        <svg class="q-eraser" viewBox="0 0 24 24"><path d="M8 20h12"/><path d="M4.6 15.6l9.8-9.8a2 2 0 0 1 2.8 0l2 2a2 2 0 0 1 0 2.8L11 18.8H7.8z"/><path d="M9.2 11l4.8 4.8"/></svg>
+      </button>
+      <div id="toast" role="status"></div>
+    </div>
+  </main>
+</div>
+
+<div id="openPanel" role="dialog" aria-label="지오지브라 자료 불러오기">
+  <h3>내 기기의 파일</h3>
+  <button class="pbtn" id="fileBtn">.ggb 파일 선택</button>
+  <input type="file" id="fileInput" hidden>
+  <div class="pdiv"></div>
+  <h3>geogebra.org 자료</h3>
+  <div class="prow">
+    <input id="matInput" type="text" placeholder="자료 주소 또는 ID" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button id="matBtn">열기</button>
+  </div>
+  <p>예: https://www.geogebra.org/m/abcd1234<br>공개되었거나 링크 공유가 켜진 자료만 열립니다.</p>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+const $ = id => document.getElementById(id);
+const board = $('board');
+const ink = $('ink');
+const ctx = ink.getContext('2d');
+const loadingEl = $('loading');
+const toastEl = $('toast');
+const selBar = $('selBar');
+const partialBtn = $('partialBtn');
+const shapeBtn = $('shapeBtn');
+const quickBtn = $('quickBtn');
+const undoBtn = $('undoBtn');
+const redoBtn = $('redoBtn');
+const clearBtn = $('clearBtn');
+const openBtn = $('openBtn');
+const openPanel = $('openPanel');
+const fileBtn = $('fileBtn');
+const fileInput = $('fileInput');
+const matInput = $('matInput');
+const matBtn = $('matBtn');
+
+const COLORS = ['#141414', '#e03131', '#1c6fd6', '#2f9e44', '#f08c00'];
+const WIDTHS = [2, 3, 5];
+const GLOW = 'rgba(43,89,195,0.28)';
+const MODE_MSG = {
+  auto: '자동: 펜은 필기, 손가락·마우스는 지오지브라 조작',
+  draw: '필기: 모든 입력이 필기가 됩니다 (펜 사용 중엔 손 터치 무시)',
+  ggb: '조작: 펜을 포함한 모든 입력이 지오지브라로 갑니다'
+};
+
+const S = {
+  mode: 'auto', tool: 'pen', partial: false, shapeFix: true,
+  color: COLORS[0], width: WIDTHS[1],
+  strokes: [], undo: [], redo: [], sel: new Set(), seq: 1
+};
+let W = 0, H = 0, DPR = 1, rect = null;
+let act = null, penSeen = false, guardUntil = 0, ggb = null;
+const blockedTouches = new Set();
+const tt = { pts: new Map(), start: 0, max: 0, bad: false };
+
+/* =========================================================
+   좌표 변환: 필기는 지오지브라 좌표(world)로 저장
+   ========================================================= */
+let VT = null;      // {L, T, h, ix, iy, xMin, yMin}
+let viewKey = '';
+
+function readView() {
+  if (!ggb || typeof ggb.getViewProperties !== 'function') return null;
+  try {
+    const p = JSON.parse(ggb.getViewProperties(1));
+    const v = {
+      L: (+p.left) || 0, T: (+p.top) || 0, h: +p.height,
+      ix: +p.invXscale, iy: +p.invYscale, xMin: +p.xMin, yMin: +p.yMin
+    };
+    if (!(v.ix > 0 && v.iy > 0 && v.h > 0 && isFinite(v.xMin) && isFinite(v.yMin))) return null;
+    return v;
+  } catch (_) { return null; }
+}
+function refreshView() {
+  const v = readView();
+  const key = v ? JSON.stringify(v) : '';
+  if (key === viewKey) return;
+  viewKey = key;
+  VT = v;
+  render();
+}
+let viewRaf = 0;
+function requestView() {
+  if (viewRaf) return;
+  viewRaf = requestAnimationFrame(() => { viewRaf = 0; refreshView(); });
+}
+setInterval(refreshView, 300);
+
+const toScreen = (x, y) => [VT.L + (x - VT.xMin) / VT.ix, VT.T + VT.h - (y - VT.yMin) / VT.iy];
+const toWorld = (sx, sy) => [VT.xMin + (sx - VT.L) * VT.ix, VT.yMin + (VT.T + VT.h - sy) * VT.iy];
+
+function bboxOf(s) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of s) {
+    if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+    if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+  }
+  return { x0, y0, x1, y1 };
+}
+// 화면 좌표 점 목록 (캐시)
+function getS(o) {
+  if (o.space === 'world' && !VT) return null;
+  const key = o.space === 'world' ? viewKey : 'screen';
+  if (o._k !== key || o._n !== o.pts.length) {
+    o._s = o.space === 'world'
+      ? o.pts.map(p => { const q = toScreen(p[0], p[1]); return [q[0], q[1], p[2]]; })
+      : o.pts;
+    o._bb = bboxOf(o._s);
+    o._k = key;
+    o._n = o.pts.length;
+  }
+  return o._s;
+}
+const invalidate = o => { o._k = null; };
+function storePt(o, x, y, p) {
+  if (o.space === 'world') { const w = toWorld(x, y); return [w[0], w[1], p]; }
+  return [x, y, p];
+}
+
+/* =========================================================
+   필기 렌더링
+   ========================================================= */
+const pf = pr => 0.4 + 1.2 * pr;
+function mid(p, i) { return [(p[i][0] + p[i + 1][0]) / 2, (p[i][1] + p[i + 1][1]) / 2]; }
+function piece(p, j, bw, ex) {
+  ctx.beginPath();
+  if (j === 1) {
+    const m = mid(p, 0);
+    ctx.lineWidth = bw * pf((p[0][2] + p[1][2]) / 2) + ex;
+    ctx.moveTo(p[0][0], p[0][1]);
+    ctx.lineTo(m[0], m[1]);
+  } else {
+    const a = mid(p, j - 2), b = mid(p, j - 1), c = p[j - 1];
+    ctx.lineWidth = bw * pf(c[2]) + ex;
+    ctx.moveTo(a[0], a[1]);
+    ctx.quadraticCurveTo(c[0], c[1], b[0], b[1]);
+  }
+  ctx.stroke();
+}
+function tail(p, bw, ex) {
+  const n = p.length;
+  if (n < 2) return;
+  const m = mid(p, n - 2), e = p[n - 1];
+  ctx.beginPath();
+  ctx.lineWidth = bw * pf(e[2]) + ex;
+  ctx.moveTo(m[0], m[1]);
+  ctx.lineTo(e[0], e[1]);
+  ctx.stroke();
+}
+function setStyle(color) {
+  ctx.strokeStyle = color; ctx.fillStyle = color;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+}
+function drawPts(p, color, bw, ex) {
+  const n = p.length;
+  if (!n) return;
+  ctx.save();
+  setStyle(color);
+  if (n === 1) {
+    ctx.beginPath();
+    ctx.arc(p[0][0], p[0][1], (bw * pf(p[0][2]) + ex) / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    for (let j = 1; j < n; j++) piece(p, j, bw, ex);
+    tail(p, bw, ex);
+  }
+  ctx.restore();
+}
+
+function selBBox() {
+  if (!S.sel.size) return null;
+  let bb = null;
+  for (const o of S.strokes) {
+    if (!S.sel.has(o.id)) continue;
+    if (!getS(o)) continue;
+    const b = o._bb, pad = o.width;
+    if (!bb) bb = { x0: b.x0 - pad, y0: b.y0 - pad, x1: b.x1 + pad, y1: b.y1 + pad };
+    else {
+      bb.x0 = Math.min(bb.x0, b.x0 - pad); bb.y0 = Math.min(bb.y0, b.y0 - pad);
+      bb.x1 = Math.max(bb.x1, b.x1 + pad); bb.y1 = Math.max(bb.y1, b.y1 + pad);
+    }
+  }
+  return bb;
+}
+
+let ringState = null;
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  const selOn = S.tool === 'select' && S.sel.size > 0;
+  for (const o of S.strokes) {
+    const s = getS(o);
+    if (!s) continue;
+    if (selOn && S.sel.has(o.id)) drawPts(s, GLOW, o.width, 10);
+    drawPts(s, o.color, o.width, 0);
+  }
+
+  const bb = selOn ? selBBox() : null;
+  if (bb) {
+    ctx.save();
+    ctx.strokeStyle = '#2b59c3'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+    ctx.strokeRect(bb.x0 - 6, bb.y0 - 6, bb.x1 - bb.x0 + 12, bb.y1 - bb.y0 + 12);
+    ctx.restore();
+    selBar.classList.add('show');
+    const bw = selBar.offsetWidth || 170, bh = selBar.offsetHeight || 50;
+    const left = Math.min(Math.max(8, bb.x0 - 6), W - bw - 8);
+    let top = bb.y0 - 6 - bh - 8;
+    if (top < 8) top = Math.min(bb.y1 + 14, H - bh - 8);
+    selBar.style.left = left + 'px';
+    selBar.style.top = top + 'px';
+  } else {
+    selBar.classList.remove('show');
+  }
+
+  if (act && act.kind === 'lasso' && act.path.length > 1) {
+    ctx.save();
+    ctx.strokeStyle = '#2b59c3'; ctx.fillStyle = 'rgba(43,89,195,0.06)';
+    ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(act.path[0][0], act.path[0][1]);
+    for (let i = 1; i < act.path.length; i++) ctx.lineTo(act.path[i][0], act.path[i][1]);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  if (ringState) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(29,43,79,.55)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(ringState.x, ringState.y, ringState.r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  updateBtns();
+}
+
+/* =========================================================
+   지우개
+   ========================================================= */
+function segDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy;
+  let t = L < 1e-12 ? 0 : ((px - ax) * dx + (py - ay) * dy) / L;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
+}
+function nearBB(bb, x, y, r) {
+  return x >= bb.x0 - r && x <= bb.x1 + r && y >= bb.y0 - r && y <= bb.y1 + r;
+}
+function hitStroke(o, x, y, r) {
+  const s = getS(o);
+  if (!s) return false;
+  const tt = r + o.width;
+  if (!nearBB(o._bb, x, y, tt)) return false;
+  if (s.length === 1) return Math.hypot(s[0][0] - x, s[0][1] - y) < tt;
+  for (let i = 1; i < s.length; i++) {
+    if (segDist(x, y, s[i - 1][0], s[i - 1][1], s[i][0], s[i][1]) < tt) return true;
+  }
+  return false;
+}
+
+// 선분 a→b 중 원 밖에 있는 구간들 [t0, t1]
+function outsideIntervals(a, b, cx, cy, r2) {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const fx = a[0] - cx, fy = a[1] - cy;
+  const A = dx * dx + dy * dy;
+  if (A < 1e-12) return (fx * fx + fy * fy < r2) ? [] : [[0, 1]];
+  const B = 2 * (fx * dx + fy * dy);
+  const C = fx * fx + fy * fy - r2;
+  const D = B * B - 4 * A * C;
+  if (D <= 0) return [[0, 1]];
+  const sq = Math.sqrt(D);
+  const t1 = (-B - sq) / (2 * A), t2 = (-B + sq) / (2 * A);
+  if (t1 >= 1 || t2 <= 0) return [[0, 1]];
+  const out = [];
+  if (t1 > 0) out.push([0, t1]);
+  if (t2 < 1) out.push([t2, 1]);
+  return out;
+}
+const ipt = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+function polyLen(pl) {
+  let L = 0;
+  for (let i = 1; i < pl.length; i++) L += Math.hypot(pl[i][0] - pl[i - 1][0], pl[i][1] - pl[i - 1][1]);
+  return L;
+}
+// 원에 닿은 부분을 잘라낸 조각들 반환 (변화 없으면 null)
+function cutStroke(s, cx, cy, r) {
+  const r2 = r * r, n = s.length;
+  if (n === 1) {
+    return ((s[0][0] - cx) ** 2 + (s[0][1] - cy) ** 2 < r2) ? [] : null;
+  }
+  const res = [];
+  let cur = null, changed = false;
+  const flush = () => { if (cur && cur.length > 1) res.push(cur); cur = null; };
+  for (let i = 0; i < n - 1; i++) {
+    const a = s[i], b = s[i + 1];
+    const ivs = outsideIntervals(a, b, cx, cy, r2);
+    if (ivs.length === 1 && ivs[0][0] === 0 && ivs[0][1] === 1) {
+      if (!cur) cur = [a];
+      cur.push(b);
+      continue;
+    }
+    changed = true;
+    if (!ivs.length) { flush(); continue; }
+    for (const [t0, t1] of ivs) {
+      const ps = ipt(a, b, t0), pe = ipt(a, b, t1);
+      if (t0 > 0 || !cur) { flush(); cur = [ps]; }
+      cur.push(pe);
+      if (t1 < 1) flush();
+    }
+  }
+  flush();
+  if (!changed) return null;
+  return res.filter(pl => polyLen(pl) >= 1);
+}
+
+function eraseWhole(x, y, r) {
+  const n = S.strokes.length;
+  S.strokes = S.strokes.filter(o => !hitStroke(o, x, y, r));
+  return S.strokes.length !== n;
+}
+function erasePartial(x, y, r) {
+  const out = [];
+  let changed = false;
+  for (const o of S.strokes) {
+    const s = getS(o);
+    if (!s || !nearBB(o._bb, x, y, r + o.width)) { out.push(o); continue; }
+    const pieces = cutStroke(s, x, y, r + o.width / 2);
+    if (!pieces) { out.push(o); continue; }
+    changed = true;
+    for (const pc of pieces) {
+      out.push({
+        id: S.seq++, color: o.color, width: o.width, space: o.space,
+        pts: o.space === 'world' ? pc.map(q => { const w = toWorld(q[0], q[1]); return [w[0], w[1], q[2]]; }) : pc
+      });
+    }
+  }
+  if (changed) S.strokes = out;
+  return changed;
+}
+function eraseAt(x, y, a) {
+  return a.partial ? erasePartial(x, y, a.r) : eraseWhole(x, y, a.r);
+}
+
+/* =========================================================
+   영역 선택
+   ========================================================= */
+function inPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function selectByLasso(path) {
+  S.sel.clear();
+  if (path.length < 3) return;
+  const pb = bboxOf(path);
+  for (const o of S.strokes) {
+    const s = getS(o);
+    if (!s) continue;
+    const b = o._bb;
+    if (b.x1 < pb.x0 || b.x0 > pb.x1 || b.y1 < pb.y0 || b.y0 > pb.y1) continue;
+    const step = Math.max(1, Math.floor(s.length / 60));
+    let tot = 0, inn = 0;
+    for (let i = 0; i < s.length; i += step) {
+      tot++;
+      if (inPoly(s[i][0], s[i][1], path)) inn++;
+    }
+    if (tot && inn / tot >= 0.5) S.sel.add(o.id);
+  }
+}
+function translateSel(dx, dy) {
+  for (const o of S.strokes) {
+    if (!S.sel.has(o.id)) continue;
+    if (o.space === 'world') {
+      if (!VT) continue;
+      const wx = dx * VT.ix, wy = -dy * VT.iy;
+      for (const p of o.pts) { p[0] += wx; p[1] += wy; }
+    } else {
+      for (const p of o.pts) { p[0] += dx; p[1] += dy; }
+    }
+    invalidate(o);
+  }
+}
+function deleteSel() {
+  if (act || !S.sel.size) return;
+  pushUndo(snapshot());
+  S.strokes = S.strokes.filter(o => !S.sel.has(o.id));
+  S.sel.clear();
+  render();
+}
+function clearSel() {
+  if (!S.sel.size) return;
+  S.sel.clear();
+  render();
+}
+
+/* =========================================================
+   실행 취소
+   ========================================================= */
+const snapshot = () => JSON.stringify(S.strokes, (k, v) => (k.charAt(0) === '_' ? undefined : v));
+function pushUndo(s) {
+  S.undo.push(s);
+  if (S.undo.length > 150) S.undo.shift();
+  S.redo.length = 0;
+}
+function restore(json) {
+  S.strokes = JSON.parse(json);
+  S.sel.clear();
+  render();
+}
+function undo() {
+  if (act || !S.undo.length) return;
+  S.redo.push(snapshot());
+  restore(S.undo.pop());
+}
+function redo() {
+  if (act || !S.redo.length) return;
+  S.undo.push(snapshot());
+  restore(S.redo.pop());
+}
+function clearInk() {
+  if (act || !S.strokes.length) return;
+  pushUndo(snapshot());
+  S.strokes = [];
+  S.sel.clear();
+  render();
+  toast('필기를 모두 지웠습니다. 필기 취소로 되돌릴 수 있습니다.');
+}
+function updateBtns() {
+  undoBtn.disabled = !S.undo.length;
+  redoBtn.disabled = !S.redo.length;
+  clearBtn.disabled = !S.strokes.length;
+}
+
+/* =========================================================
+   입력 처리
+   ========================================================= */
+const pressureOf = e => e.pointerType === 'pen' ? (e.pressure > 0 ? e.pressure : 0.5) : 0.5;
+const isPenEraser = e => e.pointerType === 'pen' &&
+  (e.button === 5 || e.button === 2 || (e.buttons & 32) || (e.buttons & 2));
+const localPt = e => [e.clientX - rect.left, e.clientY - rect.top];
+
+function startAction(e, via) {
+  rect = ink.getBoundingClientRect();
+  const [x, y] = localPt(e);
+  const pid = e.pointerId;
+  const r = e.pointerType === 'touch' ? 22 : 12;
+
+  if (S.tool === 'eraser' || isPenEraser(e)) {
+    act = { pid, via, kind: 'eraser', partial: S.partial, r, snap: snapshot(), changed: false, last: [x, y], ptype: e.pointerType, t0: performance.now() };
+    if (eraseAt(x, y, act)) act.changed = true;
+    ringState = { x, y, r };
+    render();
+    return;
+  }
+
+  if (S.tool === 'select') {
+    const bb = selBBox();
+    if (bb && nearBB(bb, x, y, 12)) {
+      act = { pid, via, kind: 'move', snap: snapshot(), last: [x, y], moved: false, ptype: e.pointerType, t0: performance.now() };
+      return;
+    }
+    S.sel.clear();
+    act = { pid, via, kind: 'lasso', path: [[x, y]], ptype: e.pointerType, t0: performance.now() };
+    render();
+    return;
+  }
+
+  const p = pressureOf(e);
+  const o = { id: S.seq++, color: S.color, width: S.width, space: VT ? 'world' : 'screen', pts: [] };
+  o.pts.push(storePt(o, x, y, p));
+  pushUndo(snapshot());
+  S.strokes.push(o);
+  act = {
+    pid, via, kind: 'pen', o, spts: [[x, y, p]],
+    ptype: e.pointerType, t0: performance.now(),
+    anchor: [x, y], holdTimer: null, snapped: null
+  };
+  armHold();
+}
+
+function moveAction(e) {
+  if (act.kind === 'pen') {
+    const evs = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
+    const list = evs.length ? evs : [e];
+    const o = act.o, sp = act.spts;
+    if (o.space === 'world' && !VT) return;
+    if (act.snapped) {
+      const [x, y] = localPt(e);
+      updateShape(act.snapped, x, y);
+      applyShape(act);
+      render();
+      return;
+    }
+    ctx.save();
+    setStyle(o.color);
+    for (const ev of list) {
+      const [x, y] = localPt(ev);
+      const last = sp[sp.length - 1];
+      if (Math.hypot(x - last[0], y - last[1]) < 0.8) continue;
+      const p = pressureOf(ev);
+      sp.push([x, y, p]);
+      o.pts.push(storePt(o, x, y, p));
+      piece(sp, sp.length - 1, o.width, 0);
+    }
+    ctx.restore();
+    const lp = sp[sp.length - 1];
+    if (Math.hypot(lp[0] - act.anchor[0], lp[1] - act.anchor[1]) > 4) {
+      act.anchor = [lp[0], lp[1]];
+      armHold();
+    }
+    return;
+  }
+
+  const [x, y] = localPt(e);
+  switch (act.kind) {
+    case 'eraser': {
+      const [lx, ly] = act.last;
+      const steps = Math.max(1, Math.ceil(Math.hypot(x - lx, y - ly) / (act.r * 0.5)));
+      for (let i = 1; i <= steps; i++) {
+        if (eraseAt(lx + (x - lx) * i / steps, ly + (y - ly) * i / steps, act)) act.changed = true;
+      }
+      act.last = [x, y];
+      ringState = { x, y, r: act.r };
+      render();
+      break;
+    }
+    case 'lasso': {
+      const l = act.path[act.path.length - 1];
+      if (Math.hypot(x - l[0], y - l[1]) >= 2) { act.path.push([x, y]); render(); }
+      break;
+    }
+    case 'move': {
+      const dx = x - act.last[0], dy = y - act.last[1];
+      if (dx || dy) {
+        translateSel(dx, dy);
+        act.last = [x, y];
+        act.moved = true;
+        render();
+      }
+      break;
+    }
+  }
+}
+
+/* ---------- 도형 보정 (그린 뒤 펜을 멈추고 기다리면 직선·원으로) ---------- */
+const HOLD_MS = 550;
+function armHold() {
+  if (!act || act.kind !== 'pen') return;
+  clearTimeout(act.holdTimer);
+  if (!S.shapeFix || act.snapped) return;
+  const a = act;
+  a.holdTimer = setTimeout(() => onHold(a), HOLD_MS);
+}
+function onHold(a) {
+  if (act !== a || a.snapped) return;
+  if (a.o.space === 'world' && !VT) return;
+  const shp = recognize(a.spts);
+  if (!shp) return;
+  a.snapped = shp;
+  applyShape(a);
+  render();
+}
+function snapAngle(A, B) {
+  const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy);
+  if (L < 1) return B;
+  const ang = Math.atan2(dy, dx), step = Math.PI / 4;
+  const near = Math.round(ang / step) * step;
+  if (Math.abs(ang - near) < 4 * Math.PI / 180) return [A[0] + L * Math.cos(near), A[1] + L * Math.sin(near)];
+  return B;
+}
+function resample(sp, N) {
+  const cum = [0];
+  for (let i = 1; i < sp.length; i++) cum.push(cum[i - 1] + Math.hypot(sp[i][0] - sp[i - 1][0], sp[i][1] - sp[i - 1][1]));
+  const T = cum[cum.length - 1], out = [];
+  let j = 1;
+  for (let k = 0; k < N; k++) {
+    const d = T * k / N;
+    while (j < sp.length - 1 && cum[j] < d) j++;
+    const seg = cum[j] - cum[j - 1];
+    const t = seg > 0 ? (d - cum[j - 1]) / seg : 0;
+    out.push([sp[j - 1][0] + (sp[j][0] - sp[j - 1][0]) * t, sp[j - 1][1] + (sp[j][1] - sp[j - 1][1]) * t]);
+  }
+  return out;
+}
+function recognize(sp) {
+  const n = sp.length;
+  if (n < 3) return null;
+  let P = 0;
+  for (let i = 1; i < n; i++) P += Math.hypot(sp[i][0] - sp[i - 1][0], sp[i][1] - sp[i - 1][1]);
+  const A = sp[0], B = sp[n - 1];
+  const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+  const pavg = sp.reduce((sum, q) => sum + q[2], 0) / n;
+
+  // 직선
+  if (L >= 25 && P <= L * 1.2) {
+    let dmax = 0;
+    for (const q of sp) {
+      const d = segDist(q[0], q[1], A[0], A[1], B[0], B[1]);
+      if (d > dmax) dmax = d;
+    }
+    if (dmax <= Math.max(5, L * 0.06)) {
+      return { type: 'line', a: [A[0], A[1]], b: snapAngle(A, [B[0], B[1]]), pavg };
+    }
+  }
+
+  // 원 (거의 닫힌 곡선)
+  if (P >= 60 && L <= P * 0.2) {
+    const rs = resample(sp, 64);
+    let cx = 0, cy = 0;
+    for (const q of rs) { cx += q[0]; cy += q[1]; }
+    cx /= rs.length; cy /= rs.length;
+    const ds = rs.map(q => Math.hypot(q[0] - cx, q[1] - cy));
+    const r = ds.reduce((sum, d) => sum + d, 0) / ds.length;
+    if (r < 12) return null;
+    const sd = Math.sqrt(ds.reduce((sum, d) => sum + (d - r) ** 2, 0) / ds.length);
+    if (sd / r > 0.1) return null;
+    let tot = 0, prev = Math.atan2(rs[0][1] - cy, rs[0][0] - cx);
+    for (let i = 1; i < rs.length; i++) {
+      const ang = Math.atan2(rs[i][1] - cy, rs[i][0] - cx);
+      let d = ang - prev;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      tot += d;
+      prev = ang;
+    }
+    if (Math.abs(tot) < 1.75 * Math.PI) return null;
+    return { type: 'circle', c: [cx, cy], r, a0: Math.atan2(A[1] - cy, A[0] - cx), dir: tot >= 0 ? 1 : -1, pavg };
+  }
+  return null;
+}
+// 보정 후 펜을 계속 움직이면: 직선은 끝점, 원은 반지름이 따라감
+function updateShape(shp, x, y) {
+  if (shp.type === 'line') shp.b = snapAngle(shp.a, [x, y]);
+  else shp.r = Math.max(4, Math.hypot(x - shp.c[0], y - shp.c[1]));
+}
+function applyShape(a) {
+  const shp = a.snapped, p = shp.pavg;
+  let pts;
+  if (shp.type === 'line') {
+    pts = [[shp.a[0], shp.a[1], p], [shp.b[0], shp.b[1], p]];
+  } else {
+    const N = Math.max(48, Math.min(180, Math.round(2 * Math.PI * shp.r / 4)));
+    pts = [];
+    for (let i = 0; i <= N; i++) {
+      const t = shp.a0 + shp.dir * 2 * Math.PI * i / N;
+      pts.push([shp.c[0] + shp.r * Math.cos(t), shp.c[1] + shp.r * Math.sin(t), p]);
+    }
+  }
+  a.o.pts = pts.map(q => storePt(a.o, q[0], q[1], q[2]));
+  invalidate(a.o);
+}
+
+// 진행 중인 입력을 없던 일로 (두 손가락 탭 시작 시)
+function cancelAction() {
+  const a = act;
+  if (!a) return;
+  act = null;
+  clearTimeout(a.holdTimer);
+  ringState = null;
+  try { ink.releasePointerCapture(a.pid); } catch (_) {}
+  if (a.kind === 'pen') {
+    S.strokes = S.strokes.filter(o => o !== a.o);
+    S.undo.pop();
+  } else if (a.kind === 'eraser' || a.kind === 'move') {
+    S.strokes = JSON.parse(a.snap);
+  }
+  render();
+}
+
+function endAction() {
+  const a = act;
+  act = null;
+  guardUntil = performance.now() + 500;
+  switch (a.kind) {
+    case 'pen': {
+      clearTimeout(a.holdTimer);
+      if (a.snapped) { render(); break; }
+      const sp = a.spts;
+      if (sp.length === 1) drawPts(sp, a.o.color, a.o.width, 0);
+      else { ctx.save(); setStyle(a.o.color); tail(sp, a.o.width, 0); ctx.restore(); }
+      updateBtns();
+      break;
+    }
+    case 'eraser':
+      if (a.changed && a.snap !== snapshot()) pushUndo(a.snap);
+      ringState = null;
+      render();
+      break;
+    case 'lasso':
+      selectByLasso(a.path);
+      render();
+      break;
+    case 'move':
+      if (a.moved) pushUndo(a.snap);
+      render();
+      break;
+  }
+}
+
+/* ---------- 필기 모드: 캔버스가 직접 입력 받음 ---------- */
+ink.addEventListener('pointerdown', e => {
+  if (S.mode !== 'draw' || act) return;
+  if (e.pointerType === 'pen') penSeen = true;
+  if (e.pointerType === 'touch' && (penSeen || tt.pts.size > 1)) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();
+  try { ink.setPointerCapture(e.pointerId); } catch (_) {}
+  startAction(e, 'draw');
+});
+ink.addEventListener('pointermove', e => {
+  if (act && act.via === 'draw' && e.pointerId === act.pid) { e.preventDefault(); moveAction(e); }
+});
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t =>
+  ink.addEventListener(t, e => {
+    if (act && act.via === 'draw' && e.pointerId === act.pid) endAction();
+  }));
+ink.addEventListener('contextmenu', e => e.preventDefault());
+['touchstart', 'touchmove'].forEach(t =>
+  ink.addEventListener(t, e => { if (S.mode === 'draw' && e.cancelable) e.preventDefault(); }, { passive: false }));
+
+/* ---------- 자동 모드: 펜 입력만 가로채고 나머지는 지오지브라로 ---------- */
+function swallow(e) {
+  if (e.cancelable) e.preventDefault();
+  e.stopImmediatePropagation();
+}
+function inBoard(x, y) {
+  const r = board.getBoundingClientRect();
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+const inUI = t => t instanceof Node && (openPanel.contains(t) || selBar.contains(t) || quickBtn.contains(t));
+
+// 두 손가락 탭 → 펜/지우개 전환 (이벤트를 막지 않고 지켜보기만 함)
+function touchTapDown(e) {
+  if (e.pointerType !== 'touch') return;
+  const now = performance.now();
+  if (tt.pts.size === 0) { tt.start = now; tt.max = 0; tt.bad = false; }
+  if (tt.pts.size === 1 && act && act.via === 'draw' && act.ptype === 'touch' && now - act.t0 < 250) cancelAction();
+  tt.pts.set(e.pointerId, [e.clientX, e.clientY]);
+  tt.max = Math.max(tt.max, tt.pts.size);
+  if (now - tt.start > 250 || tt.max > 2 || S.mode === 'ggb' || act ||
+      inUI(e.target) || !inBoard(e.clientX, e.clientY)) tt.bad = true;
+}
+window.addEventListener('pointerdown', touchTapDown, { capture: true });
+window.addEventListener('pointermove', e => {
+  const p0 = tt.pts.get(e.pointerId);
+  if (p0 && Math.hypot(e.clientX - p0[0], e.clientY - p0[1]) > 12) tt.bad = true;
+}, { capture: true });
+['pointerup', 'pointercancel'].forEach(t =>
+  window.addEventListener(t, e => {
+    if (!tt.pts.has(e.pointerId)) return;
+    tt.pts.delete(e.pointerId);
+    if (t === 'pointercancel') tt.bad = true;
+    if (tt.pts.size === 0 && !tt.bad && tt.max === 2 && performance.now() - tt.start < 400) toggleEraser();
+  }, { capture: true }));
+
+// 불러오기 패널 바깥을 누르면 닫기 (펜 가로채기보다 먼저 등록)
+window.addEventListener('pointerdown', e => {
+  if (openPanel.classList.contains('show') && !openPanel.contains(e.target) && !openBtn.contains(e.target)) closePanel();
+}, { capture: true });
+
+window.addEventListener('pointerdown', e => {
+  if (S.mode !== 'auto' || e.pointerType !== 'pen' || inUI(e.target) || !inBoard(e.clientX, e.clientY)) return;
+  swallow(e);
+  if (act) return;
+  penSeen = true;
+  startAction(e, 'auto');
+}, { capture: true, passive: false });
+
+window.addEventListener('pointermove', e => {
+  if (act && act.via === 'auto' && e.pointerId === act.pid) { swallow(e); moveAction(e); }
+}, { capture: true, passive: false });
+
+['pointerup', 'pointercancel'].forEach(t =>
+  window.addEventListener(t, e => {
+    if (act && act.via === 'auto' && e.pointerId === act.pid) { swallow(e); endAction(); }
+  }, { capture: true, passive: false }));
+
+// 펜(및 필기 중 닿은 손바닥)이 만든 터치 이벤트가 지오지브라로 새지 않도록 차단
+['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(t =>
+  window.addEventListener(t, e => {
+    if (S.mode !== 'auto' || inUI(e.target)) return;
+    const touches = Array.from(e.changedTouches);
+    if (t === 'touchstart') {
+      const stylus = touches.some(tc => tc.touchType === 'stylus');
+      if ((act && act.via === 'auto') || stylus) {
+        touches.forEach(tc => blockedTouches.add(tc.identifier));
+        swallow(e);
+      }
+      return;
+    }
+    if (touches.length && touches.every(tc => blockedTouches.has(tc.identifier))) {
+      swallow(e);
+      if (t === 'touchend' || t === 'touchcancel') touches.forEach(tc => blockedTouches.delete(tc.identifier));
+    }
+  }, { capture: true, passive: false }));
+
+['click', 'dblclick', 'contextmenu'].forEach(t =>
+  window.addEventListener(t, e => {
+    if (S.mode === 'auto' && performance.now() < guardUntil && !inUI(e.target) && inBoard(e.clientX, e.clientY)) swallow(e);
+  }, { capture: true }));
+
+/* =========================================================
+   UI
+   ========================================================= */
+let toastTimer = null;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+}
+
+function setMode(m, silent) {
+  if (act) return;
+  S.mode = m;
+  ink.classList.toggle('drawing', m === 'draw');
+  document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+  if (!silent) toast(MODE_MSG[m]);
+}
+function setTool(t) {
+  if (act) return;
+  S.tool = t;
+  if (t !== 'select') S.sel.clear();
+  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+  quickBtn.classList.toggle('eraser', t === 'eraser');
+  quickBtn.setAttribute('aria-label', t === 'eraser' ? '지우개 사용 중 (펜으로 전환)' : '펜 사용 중 (지우개로 전환)');
+  render();
+}
+function toggleEraser() {
+  if (act) return;
+  setTool(S.tool === 'eraser' ? 'pen' : 'eraser');
+  toast(S.tool === 'eraser' ? '지우개로 전환' : '펜으로 전환');
+}
+function setShapeFix(v) {
+  S.shapeFix = v;
+  shapeBtn.classList.toggle('active', v);
+  shapeBtn.setAttribute('aria-pressed', String(v));
+}
+function setPartial(v) {
+  S.partial = v;
+  partialBtn.classList.toggle('active', v);
+  partialBtn.setAttribute('aria-pressed', String(v));
+}
+function applyToSel(fn) {
+  if (S.tool !== 'select' || !S.sel.size || act) return false;
+  pushUndo(snapshot());
+  for (const o of S.strokes) if (S.sel.has(o.id)) fn(o);
+  render();
+  return true;
+}
+function setColor(c) {
+  S.color = c;
+  document.querySelectorAll('.swatch').forEach(b => b.classList.toggle('active', b.dataset.color === c));
+  if (applyToSel(o => { o.color = c; })) return;
+  if (S.tool !== 'pen') setTool('pen');
+}
+function setWidth(w) {
+  S.width = w;
+  document.querySelectorAll('.wbtn').forEach(b => b.classList.toggle('active', Number(b.dataset.width) === w));
+  if (applyToSel(o => { o.width = w; })) return;
+  if (S.tool !== 'pen') setTool('pen');
+}
+
+document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => {
+  setTool(b.dataset.tool);
+  if (b.dataset.tool === 'select') toast('필기를 둘러싸서 선택한 뒤, 상자 안을 끌어 옮기거나 삭제를 누르세요.');
+}));
+partialBtn.addEventListener('click', () => {
+  setPartial(!S.partial);
+  setTool('eraser');
+  toast(S.partial ? '부분 지우기: 지우개가 닿은 부분만 지웁니다.' : '획 지우기: 닿은 획을 통째로 지웁니다.');
+});
+shapeBtn.addEventListener('click', () => {
+  setShapeFix(!S.shapeFix);
+  toast(S.shapeFix
+    ? '도형 보정: 선이나 원을 그린 뒤 펜을 멈추고 기다리면 반듯하게 바뀝니다.'
+    : '도형 보정을 껐습니다.');
+});
+
+/* ---------- 떠 있는 펜/지우개 버튼 (끌어서 위치 이동) ---------- */
+const QKEY = 'ggbBoard.quickPos', QS = 58, QM = 12;
+const clamp01 = v => Math.min(1, Math.max(0, v));
+let qpos = { rx: 1, ry: 1 };
+try {
+  const v = JSON.parse(localStorage.getItem(QKEY));
+  if (v && isFinite(v.rx) && isFinite(v.ry)) qpos = { rx: clamp01(v.rx), ry: clamp01(v.ry) };
+} catch (_) {}
+function placeQuick() {
+  const spanX = Math.max(0, W - QS - 2 * QM), spanY = Math.max(0, H - QS - 2 * QM);
+  quickBtn.style.left = (QM + qpos.rx * spanX) + 'px';
+  quickBtn.style.top = (QM + qpos.ry * spanY) + 'px';
+}
+let qd = null;
+quickBtn.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  try { quickBtn.setPointerCapture(e.pointerId); } catch (_) {}
+  qd = { pid: e.pointerId, sx: e.clientX, sy: e.clientY, l: quickBtn.offsetLeft, t: quickBtn.offsetTop, moved: false };
+});
+quickBtn.addEventListener('pointermove', e => {
+  if (!qd || e.pointerId !== qd.pid) return;
+  const dx = e.clientX - qd.sx, dy = e.clientY - qd.sy;
+  if (!qd.moved && Math.hypot(dx, dy) < 6) return;
+  qd.moved = true;
+  const spanX = Math.max(1, W - QS - 2 * QM), spanY = Math.max(1, H - QS - 2 * QM);
+  qpos = { rx: clamp01((qd.l + dx - QM) / spanX), ry: clamp01((qd.t + dy - QM) / spanY) };
+  placeQuick();
+});
+function quickEnd(e) {
+  if (!qd || e.pointerId !== qd.pid) return;
+  const d = qd;
+  qd = null;
+  if (d.moved) {
+    try { localStorage.setItem(QKEY, JSON.stringify(qpos)); } catch (_) {}
+  } else if (e.type === 'pointerup') {
+    toggleEraser();
+  }
+}
+quickBtn.addEventListener('pointerup', quickEnd);
+quickBtn.addEventListener('pointercancel', quickEnd);
+quickBtn.addEventListener('touchstart', e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
+quickBtn.addEventListener('click', e => { if (e.detail === 0) toggleEraser(); });
+
+const colorsEl = $('colors');
+COLORS.forEach(c => {
+  const b = document.createElement('button');
+  b.className = 'swatch';
+  b.dataset.color = c;
+  b.style.setProperty('--c', c);
+  b.setAttribute('aria-label', '색 ' + c);
+  b.addEventListener('click', () => setColor(c));
+  colorsEl.appendChild(b);
+});
+
+const widthsEl = $('widths');
+['가늘게', '보통', '굵게'].forEach((label, i) => {
+  const w = WIDTHS[i];
+  const b = document.createElement('button');
+  b.className = 'wbtn';
+  b.dataset.width = w;
+  b.setAttribute('aria-label', '굵기 ' + label);
+  const d = 4 + w * 2;
+  b.innerHTML = `<i style="width:${d}px;height:${d}px"></i>`;
+  b.addEventListener('click', () => setWidth(w));
+  widthsEl.appendChild(b);
+});
+
+undoBtn.addEventListener('click', undo);
+redoBtn.addEventListener('click', redo);
+clearBtn.addEventListener('click', clearInk);
+$('selDel').addEventListener('click', deleteSel);
+$('selDone').addEventListener('click', clearSel);
+
+/* ---------- 크기 ---------- */
+let ggbResizeTimer = null;
+function resize() {
+  const r = board.getBoundingClientRect();
+  W = r.width; H = r.height;
+  DPR = window.devicePixelRatio || 1;
+  ink.width = Math.max(1, Math.round(W * DPR));
+  ink.height = Math.max(1, Math.round(H * DPR));
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  rect = ink.getBoundingClientRect();
+  placeQuick();
+  render();
+  clearTimeout(ggbResizeTimer);
+  ggbResizeTimer = setTimeout(() => {
+    if (ggb && typeof ggb.setSize === 'function') ggb.setSize(Math.floor(W), Math.floor(H));
+    requestView();
+  }, 150);
+}
+new ResizeObserver(resize).observe(board);
+
+/* =========================================================
+   지오지브라
+   ========================================================= */
+function showLoading(msg) { loadingEl.textContent = msg; loadingEl.classList.remove('hidden'); }
+function hideLoading() { loadingEl.classList.add('hidden'); }
+
+function attachViewListener() {
+  if (!ggb || typeof ggb.registerClientListener !== 'function') return;
+  try {
+    ggb.registerClientListener(ev => {
+      const type = ev && (ev.type || ev[0]);
+      if (type === 'viewChanged2D' || type === 'perspectiveChange' ||
+          type === 'sidePanelOpened' || type === 'sidePanelClosed') requestView();
+    });
+  } catch (_) {}
+}
+
+let loadTimer = null;
+function loadGGB(materialId) {
+  if (typeof window.GGBApplet === 'undefined') {
+    showLoading('지오지브라를 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침하세요.');
+    return;
+  }
+  if (act) endAction();
+  ggb = null;
+  refreshView();
+  const old = $('ggb');
+  const fresh = document.createElement('div');
+  fresh.id = 'ggb';
+  old.replaceWith(fresh);
+
+  showLoading(materialId ? '자료를 불러오는 중…' : '지오지브라를 불러오는 중…');
+  clearTimeout(loadTimer);
+  loadTimer = setTimeout(() => {
+    if (!ggb) showLoading(materialId
+      ? '자료를 불러오지 못했습니다. 주소와 공개 설정을 확인하세요.'
+      : '지오지브라를 불러오지 못했습니다. 인터넷 연결을 확인하세요.');
+  }, 20000);
+
+  const r = board.getBoundingClientRect();
+  const params = {
+    width: Math.floor(r.width),
+    height: Math.floor(r.height),
+    language: 'ko',
+    borderColor: '#FFFFFF',
+    appletOnLoad: api => {
+      ggb = api || window.ggbApplet;
+      clearTimeout(loadTimer);
+      hideLoading();
+      if (ggb && typeof ggb.setSize === 'function') ggb.setSize(Math.floor(W), Math.floor(H));
+      attachViewListener();
+      refreshView();
+    }
+  };
+  if (materialId) params.material_id = materialId;
+  else params.appName = 'geometry';
+  new window.GGBApplet(params, true).inject('ggb');
+}
+
+function parseMaterialId(str) {
+  const s = (str || '').trim();
+  if (!s) return null;
+  const m = s.match(/geogebra\.org\/(?:m|classic|geometry|graphing|calculator|3d|suite|notes|material\/show\/id)\/([A-Za-z0-9]+)/i)
+         || s.match(/ggbm\.at\/([A-Za-z0-9]+)/i);
+  if (m) return m[1];
+  return /^[A-Za-z0-9]+$/.test(s) ? s : null;
+}
+function setUrlId(id) {
+  try {
+    const u = new URL(location.href);
+    if (id) u.searchParams.set('id', id); else u.searchParams.delete('id');
+    history.replaceState(null, '', u);
+  } catch (_) {}
+}
+
+/* ---------- 불러오기 패널 ---------- */
+function openPanelNow() {
+  const r = openBtn.getBoundingClientRect();
+  const pw = Math.min(340, window.innerWidth - 16);
+  const left = Math.min(Math.max(8, r.left), window.innerWidth - pw - 8);
+  openPanel.style.left = left + 'px';
+  openPanel.style.top = (r.bottom + 6) + 'px';
+  openPanel.classList.add('show');
+  openBtn.classList.add('active');
+  openBtn.setAttribute('aria-expanded', 'true');
+}
+function closePanel() {
+  openPanel.classList.remove('show');
+  openBtn.classList.remove('active');
+  openBtn.setAttribute('aria-expanded', 'false');
+}
+openBtn.addEventListener('click', () => {
+  if (openPanel.classList.contains('show')) closePanel(); else openPanelNow();
+});
+
+function openMaterial() {
+  const id = parseMaterialId(matInput.value);
+  if (!id) { toast('자료 주소나 ID를 확인하세요.'); return; }
+  matInput.blur();
+  closePanel();
+  setUrlId(id);
+  loadGGB(id);
+}
+matBtn.addEventListener('click', openMaterial);
+matInput.addEventListener('keydown', e => { if (e.key === 'Enter') openMaterial(); });
+
+fileBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files && fileInput.files[0];
+  fileInput.value = '';
+  if (!f) return;
+  if (!/\.ggb$/i.test(f.name)) { toast('.ggb 파일만 열 수 있습니다.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const b64 = String(reader.result).split(',')[1] || '';
+    closePanel();
+    openBase64(b64, f.name);
+  };
+  reader.onerror = () => toast('파일을 읽지 못했습니다.');
+  reader.readAsDataURL(f);
+});
+function openBase64(b64, name) {
+  if (!ggb || typeof ggb.setBase64 !== 'function') {
+    toast('지오지브라가 아직 준비되지 않았습니다. 잠시 후 다시 시도하세요.');
+    return;
+  }
+  try {
+    ggb.setBase64(b64, () => requestView());
+  } catch (_) {
+    toast('파일을 열지 못했습니다.');
+    return;
+  }
+  setTimeout(requestView, 800);
+  setUrlId(null);
+  toast(`‘${name}’ 파일을 열었습니다.`);
+}
+
+/* ---------- 시작 ---------- */
+setMode('auto', true);
+setTool('pen');
+setPartial(false);
+setShapeFix(true);
+setColor(COLORS[0]);
+setWidth(WIDTHS[1]);
+resize();
+
+const initialId = parseMaterialId(new URLSearchParams(location.search).get('id'));
+const s = document.createElement('script');
+s.src = 'https://www.geogebra.org/apps/deployggb.js';
+s.onload = () => loadGGB(initialId);
+s.onerror = () => loadGGB(initialId);
+document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
