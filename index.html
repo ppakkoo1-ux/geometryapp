@@ -742,6 +742,8 @@ function moveAction(e) {
 
 /* ---------- 도형 보정 (그린 뒤 펜을 멈추고 기다리면 직선·원으로) ---------- */
 const HOLD_MS = 550;
+let lastDiag = null;
+let diagOn = false;
 function armHold() {
   if (!act || act.kind !== 'pen') return;
   clearTimeout(act.holdTimer);
@@ -753,11 +755,23 @@ function onHold(a) {
   if (act !== a || a.snapped) return;
   if (a.o.space === 'world' && !VT) return;
   // 펜을 멈춘 뒤 들어온 떨림 좌표는 판정에서 제외
+  lastDiag = null;
   const shp = recognize(a.spts.slice(0, a.anchorIdx + 1));
+  if (diagOn) showDiag(a);
   if (!shp) return;
   a.snapped = shp;
   applyShape(a);
   render();
+}
+function showDiag(a) {
+  const d = lastDiag;
+  if (!d) { toast('판정 실패: 좌표가 너무 적음 (점 ' + a.spts.length + '개)'); return; }
+  const f = v => (Math.round(v * 10) / 10);
+  let msg = '길이 ' + f(d.span) + ' · 휨 ' + f(d.rms) + '/' + f(d.rmsLim) +
+    ' · 최대휨 ' + f(d.dmax) + '/' + f(d.dLim) + ' · 되돌아감 ' + d.back + ' · 점 ' + d.n;
+  if (d.circle) msg += ' | 원 r' + f(d.circle.r) + ' 고르기 ' + f(d.circle.sd * 100) + '% 회전 ' + f(d.circle.cov * 100) + '%';
+  msg += ' → ' + (d.hit ? d.hit === 'line' ? '직선 보정' : '원 보정' : '보정 안 함');
+  toast(msg);
 }
 function snapAngle(A, B) {
   const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy);
@@ -816,20 +830,43 @@ function recognize(raw) {
   const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
   const pavg = raw.reduce((sum, q) => sum + q[2], 0) / raw.length;
 
-  // 직선: 선에서 벗어난 정도가 작고, 진행 방향으로 되돌아가지 않을 것
-  if (L >= 25 && P <= L * 1.6) {
-    const ux = (B[0] - A[0]) / L, uy = (B[1] - A[1]) / L;
-    let dmax = 0, back = 0, maxT = -Infinity;
-    for (const q of sp) {
-      const d = segDist(q[0], q[1], A[0], A[1], B[0], B[1]);
-      if (d > dmax) dmax = d;
-      const t = ((q[0] - A[0]) * ux + (q[1] - A[1]) * uy) / L;
-      if (t < maxT - 0.06) back++;
-      else if (t > maxT) maxT = t;
-    }
-    if (dmax <= Math.max(6, L * 0.08) && back === 0) {
-      return { type: 'line', a: [A[0], A[1]], b: snapAngle(A, [B[0], B[1]]), pavg };
-    }
+  // 직선: 점들에 가장 잘 맞는 직선(주축)을 구해 그 직선과의 편차로 판정
+  let mx = 0, my = 0;
+  for (const q of sp) { mx += q[0]; my += q[1]; }
+  mx /= n; my /= n;
+  let sxx = 0, syy = 0, sxy = 0;
+  for (const q of sp) {
+    const dx = q[0] - mx, dy = q[1] - my;
+    sxx += dx * dx; syy += dy * dy; sxy += dx * dy;
+  }
+  const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  const ux = Math.cos(ang), uy = Math.sin(ang);
+  let rms = 0, dmax = 0, tmin = Infinity, tmax = -Infinity;
+  for (const q of sp) {
+    const dx = q[0] - mx, dy = q[1] - my;
+    const t = dx * ux + dy * uy;
+    const d = Math.abs(dy * ux - dx * uy);
+    rms += d * d;
+    if (d > dmax) dmax = d;
+    if (t < tmin) tmin = t;
+    if (t > tmax) tmax = t;
+  }
+  rms = Math.sqrt(rms / n);
+  const span = tmax - tmin;
+  const dir = ((sp[0][0] - mx) * ux + (sp[0][1] - my) * uy) <= 0 ? 1 : -1;
+  let back = 0, maxT = -Infinity;
+  for (const q of sp) {
+    const t = dir * ((q[0] - mx) * ux + (q[1] - my) * uy);
+    if (t < maxT - span * 0.12) back++;
+    else if (t > maxT) maxT = t;
+  }
+  const rmsLim = Math.max(2.5, span * 0.035), dLim = Math.max(8, span * 0.12);
+  lastDiag = { n, span, L, P, rms, rmsLim, dmax, dLim, back };
+  if (span >= 25 && rms <= rmsLim && dmax <= dLim && back === 0) {
+    lastDiag.hit = 'line';
+    const P1 = [mx + ux * tmin, my + uy * tmin], P2 = [mx + ux * tmax, my + uy * tmax];
+    const a2 = dir > 0 ? P1 : P2, b2 = dir > 0 ? P2 : P1;
+    return { type: 'line', a: a2, b: snapAngle(a2, b2), pavg };
   }
 
   // 원 (거의 닫힌 곡선)
@@ -842,6 +879,7 @@ function recognize(raw) {
     const r = ds.reduce((sum, d) => sum + d, 0) / ds.length;
     if (r < 12) return null;
     const sd = Math.sqrt(ds.reduce((sum, d) => sum + (d - r) ** 2, 0) / ds.length);
+    lastDiag.circle = { r, sd: sd / r, cov: 0 };
     if (sd / r > 0.1) return null;
     let tot = 0, prev = Math.atan2(rs[0][1] - cy, rs[0][0] - cx);
     for (let i = 1; i < rs.length; i++) {
@@ -852,7 +890,9 @@ function recognize(raw) {
       tot += d;
       prev = ang;
     }
+    lastDiag.circle = { r, sd: sd / r, cov: Math.abs(tot) / (2 * Math.PI) };
     if (Math.abs(tot) < 1.75 * Math.PI) return null;
+    lastDiag.hit = 'circle';
     return { type: 'circle', c: [cx, cy], r, a0: Math.atan2(A[1] - cy, A[0] - cx), dir: tot >= 0 ? 1 : -1, pavg };
   }
   return null;
@@ -1036,7 +1076,7 @@ function toast(msg) {
   toastEl.textContent = msg;
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), msg.length > 40 ? 6000 : 2600);
 }
 
 function setMode(m, silent) {
@@ -1100,7 +1140,19 @@ partialBtn.addEventListener('click', () => {
   setTool('eraser');
   toast(S.partial ? '부분 지우기: 지우개가 닿은 부분만 지웁니다.' : '획 지우기: 닿은 획을 통째로 지웁니다.');
 });
+let shapeHold = null;
+shapeBtn.addEventListener('pointerdown', () => {
+  clearTimeout(shapeHold);
+  shapeHold = setTimeout(() => {
+    shapeHold = null;
+    diagOn = !diagOn;
+    toast(diagOn ? '진단 표시 켬: 멈출 때마다 판정 값을 보여줍니다.' : '진단 표시 끔');
+  }, 800);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t =>
+  shapeBtn.addEventListener(t, () => { clearTimeout(shapeHold); }));
 shapeBtn.addEventListener('click', () => {
+  if (shapeHold === null) { shapeHold = undefined; return; }
   setShapeFix(!S.shapeFix);
   toast(S.shapeFix
     ? '도형 보정: 선이나 원을 그린 뒤 펜을 멈추고 기다리면 반듯하게 바뀝니다.'
